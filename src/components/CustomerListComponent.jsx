@@ -1,17 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { Link } from 'react-router-dom'; 
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
+import { AppBar, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Toolbar, Typography } from '@mui/material';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { Link } from 'react-router-dom';
+import { CSVLink } from 'react-csv';
+
+const EditButton = ({ customerUrl, rowData, onClick }) => {
+    const handleClick = () => {
+        onClick(rowData);
+    };
+
+    return (
+        <button onClick={handleClick}>Edit</button>
+    );
+};
+
+const DeleteButton = ({ customerUrl, onClick }) => {
+    const handleClick = () => {
+        onClick(customerUrl);
+    };
+
+    return (
+        <button onClick={handleClick}>Delete</button>
+    );
+};
 
 const CustomerListComponent = () => {
     const [rowData, setRowData] = useState([]);
@@ -25,6 +38,10 @@ const CustomerListComponent = () => {
         phone: '',
         email: ''
     });
+    const [editCustomer, setEditCustomer] = useState(null);
+    const [deleteCustomerUrl, setDeleteCustomerUrl] = useState(null);
+    const [openDeleteConfirmation, setOpenDeleteConfirmation] = useState(false);
+    const [openEditDialog, setOpenEditDialog] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -37,6 +54,7 @@ const CustomerListComponent = () => {
                 throw new Error('Failed to fetch data');
             }
             const data = await response.json();
+            console.log('Customers data:', data._embedded.customers);
             setRowData(data._embedded.customers);
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -49,11 +67,18 @@ const CustomerListComponent = () => {
 
     const handleClose = () => {
         setOpen(false);
+        setOpenEditDialog(false);
+        setEditCustomer(null);
     };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setNewCustomer({ ...newCustomer, [name]: value });
+    };
+
+    const handleEditInputChange = (e) => {
+        const { name, value } = e.target;
+        setEditCustomer({ ...editCustomer, [name]: value });
     };
 
     const handleAddCustomerSubmit = async () => {
@@ -75,6 +100,54 @@ const CustomerListComponent = () => {
         }
     };
 
+    const handleEditClick = (customerData) => {
+        setEditCustomer(customerData);
+        setOpenEditDialog(true);
+    };
+
+    const handleDeleteClick = (customerUrl) => {
+        setDeleteCustomerUrl(customerUrl);
+        setOpenDeleteConfirmation(true);
+    };
+
+    const handleCloseDeleteConfirmation = () => {
+        setOpenDeleteConfirmation(false);
+    };
+
+    const handleConfirmDelete = async () => {
+        try {
+            const response = await fetch(deleteCustomerUrl, {
+                method: 'DELETE',
+            });
+            if (!response.ok) {
+                throw new Error('Failed to delete customer');
+            }
+            fetchData(); 
+            handleCloseDeleteConfirmation(); 
+        } catch (error) {
+            console.error('Error deleting customer:', error);
+        }
+    };
+
+    const handleConfirmEdit = async () => {
+        try {
+            const response = await fetch(editCustomer._links.customer.href, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(editCustomer),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to update customer');
+            }
+            fetchData(); 
+            handleClose(); 
+        } catch (error) {
+            console.error('Error updating customer:', error);
+        }
+    };
+
     const columnDefs = [
         { headerName: 'First name', field: 'firstname', sortable: true, filter: true },
         { headerName: 'Last name', field: 'lastname', sortable: true, filter: true },
@@ -83,22 +156,46 @@ const CustomerListComponent = () => {
         { headerName: 'City', field: 'city', sortable: true, filter: true },
         { headerName: 'Phone', field: 'phone', sortable: true, filter: true },
         { headerName: 'Email', field: 'email', sortable: true, filter: true },
+        {
+            headerName: 'Actions',
+            field: 'actions',
+            width: 180,
+            cellRenderer: (params) => {
+                return (
+                    <>
+                        <EditButton customerUrl={params.data._links.customer.href} rowData={params.data} onClick={handleEditClick} />
+                        <DeleteButton customerUrl={params.data._links.customer.href} onClick={handleDeleteClick} />
+                    </>
+                );
+            },
+        },
     ];
+    const csvData = rowData.map(row => ({
+        'Customer First Name': row.firstname,
+        'Customer Last Name': row.lastname,
+        'Postcode': row.postcode,
+        'City': row.city,
+        'Phone': row.phone,
+        'Email': row.email,
+    }));
 
     return (
         <>
             <AppBar position="static">
-                <Toolbar>
+                <Toolbar style={{ justifyContent: 'space-between' }}>
                     <Typography variant="h6">
                         PTPal
                     </Typography>
-                    <div style={{ marginLeft: 'auto' }}>
+                    <div>
+                    <CSVLink data={csvData} filename={"customers.csv"}>
+                            <Button color="inherit">Export to CSV</Button>
+                        </CSVLink>
                         <Button color="inherit" onClick={handleAddCustomer}>Add Customer</Button>
                         <Button color="inherit" component={Link} to="/training">Training</Button>
                     </div>
                 </Toolbar>
             </AppBar>
-            <div className="ag-theme-alpine" style={{ height: 'calc(100vh - 64px)', width: '1500px' }}>
+            <div className="ag-theme-alpine" style={{ height: 'calc(100vh - 64px)', width: '1500px', margin: '0 auto' }}>
                 <AgGridReact
                     rowData={rowData}
                     columnDefs={columnDefs}
@@ -107,7 +204,94 @@ const CustomerListComponent = () => {
                 />
             </div>
             <Dialog open={open} onClose={handleClose}>
-                <DialogTitle>Add New Customer</DialogTitle>
+                <DialogTitle>{deleteCustomerUrl ? 'Delete Customer?' : 'Add New Customer'}</DialogTitle>
+                <DialogContent>
+                    {!deleteCustomerUrl && (
+                        <>
+                            <TextField
+                                autoFocus
+                                margin="dense"
+                                id="firstname"
+                                name="firstname"
+                                label="First Name"
+                                fullWidth
+                                value={newCustomer.firstname}
+                                onChange={handleInputChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                id="lastname"
+                                name="lastname"
+                                label="Last Name"
+                                fullWidth
+                                value={newCustomer.lastname}
+                                onChange={handleInputChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                id="streetaddress"
+                                name="streetaddress"
+                                label="Street Address"
+                                fullWidth
+                                value={newCustomer.streetaddress}
+                                onChange={handleInputChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                id="postcode"
+                                name="postcode"
+                                label="Postcode"
+                                fullWidth
+                                value={newCustomer.postcode}
+                                onChange={handleInputChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                id="city"
+                                name="city"
+                                label="City"
+                                fullWidth
+                                value={newCustomer.city}
+                                onChange={handleInputChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                id="phone"
+                                name="phone"
+                                label="Phone"
+                                fullWidth
+                                value={newCustomer.phone}
+                                onChange={handleInputChange}
+                            />
+                            <TextField
+                                margin="dense"
+                                id="email"
+                                name="email"
+                                label="Email"
+                                fullWidth
+                                value={newCustomer.email}
+                                onChange={handleInputChange}
+                            />
+                        </>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    {!deleteCustomerUrl && (
+                        <>
+                            <Button onClick={handleClose}>Cancel</Button>
+                            <Button onClick={handleAddCustomerSubmit}>Add</Button>
+                        </>
+                    )}
+                    {deleteCustomerUrl && (
+                        <>
+                            <Button onClick={handleClose}>Cancel</Button>
+                            <Button onClick={handleConfirmDelete}>Delete</Button>
+                        </>
+                    )}
+                </DialogActions>
+            </Dialog>
+            <Dialog open={openEditDialog} onClose={handleClose}>
+                <DialogTitle>Edit Customer</DialogTitle>
                 <DialogContent>
                     <TextField
                         autoFocus
@@ -116,8 +300,8 @@ const CustomerListComponent = () => {
                         name="firstname"
                         label="First Name"
                         fullWidth
-                        value={newCustomer.firstname}
-                        onChange={handleInputChange}
+                        value={editCustomer ? editCustomer.firstname : ''}
+                        onChange={handleEditInputChange}
                     />
                     <TextField
                         margin="dense"
@@ -125,8 +309,8 @@ const CustomerListComponent = () => {
                         name="lastname"
                         label="Last Name"
                         fullWidth
-                        value={newCustomer.lastname}
-                        onChange={handleInputChange}
+                        value={editCustomer ? editCustomer.lastname : ''}
+                        onChange={handleEditInputChange}
                     />
                     <TextField
                         margin="dense"
@@ -134,8 +318,8 @@ const CustomerListComponent = () => {
                         name="streetaddress"
                         label="Street Address"
                         fullWidth
-                        value={newCustomer.streetaddress}
-                        onChange={handleInputChange}
+                        value={editCustomer ? editCustomer.streetaddress : ''}
+                        onChange={handleEditInputChange}
                     />
                     <TextField
                         margin="dense"
@@ -143,8 +327,8 @@ const CustomerListComponent = () => {
                         name="postcode"
                         label="Postcode"
                         fullWidth
-                        value={newCustomer.postcode}
-                        onChange={handleInputChange}
+                        value={editCustomer ? editCustomer.postcode : ''}
+                        onChange={handleEditInputChange}
                     />
                     <TextField
                         margin="dense"
@@ -152,8 +336,8 @@ const CustomerListComponent = () => {
                         name="city"
                         label="City"
                         fullWidth
-                        value={newCustomer.city}
-                        onChange={handleInputChange}
+                        value={editCustomer ? editCustomer.city : ''}
+                        onChange={handleEditInputChange}
                     />
                     <TextField
                         margin="dense"
@@ -161,8 +345,8 @@ const CustomerListComponent = () => {
                         name="phone"
                         label="Phone"
                         fullWidth
-                        value={newCustomer.phone}
-                        onChange={handleInputChange}
+                        value={editCustomer ? editCustomer.phone : ''}
+                        onChange={handleEditInputChange}
                     />
                     <TextField
                         margin="dense"
@@ -170,13 +354,23 @@ const CustomerListComponent = () => {
                         name="email"
                         label="Email"
                         fullWidth
-                        value={newCustomer.email}
-                        onChange={handleInputChange}
+                        value={editCustomer ? editCustomer.email : ''}
+                        onChange={handleEditInputChange}
                     />
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose}>Cancel</Button>
-                    <Button onClick={handleAddCustomerSubmit}>Add</Button>
+                    <Button onClick={handleConfirmEdit}>Save</Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog open={openDeleteConfirmation} onClose={handleCloseDeleteConfirmation}>
+                <DialogTitle>Delete Customer?</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1">Are you sure you want to delete this customer?</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDeleteConfirmation}>Cancel</Button>
+                    <Button onClick={handleConfirmDelete} color="error">Delete</Button>
                 </DialogActions>
             </Dialog>
         </>
