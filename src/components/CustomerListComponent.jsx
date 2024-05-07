@@ -163,7 +163,7 @@ const CustomerListComponent = () => {
             cellRenderer: (params) => {
                 return (
                     <>
-                        <EditButton customerUrl={params.data._links.customer.href} rowData={params.data} onClick={handleEditClick} />
+                        <EditButton customerUrl={params.data._links.customer.href} rowData={params.data} onClick={handleEditClick}  />
                         <DeleteButton customerUrl={params.data._links.customer.href} onClick={handleDeleteClick} />
                     </>
                 );
@@ -183,15 +183,16 @@ const CustomerListComponent = () => {
         <>
             <AppBar position="static">
                 <Toolbar style={{ justifyContent: 'space-between' }}>
-                    <Typography variant="h6">
+                <Typography variant="h6" component={Link} to="/" style={{ color: 'inherit', textDecoration: 'none' }}>
                         PTPal
                     </Typography>
                     <div>
                     <CSVLink data={csvData} filename={"customers.csv"}>
-                            <Button color="inherit">Export to CSV</Button>
+                            <Button style={{ color : 'white'}}>Export to CSV</Button>
                         </CSVLink>
-                        <Button color="inherit" onClick={handleAddCustomer}>Add Customer</Button>
                         <Button color="inherit" component={Link} to="/training">Training</Button>
+                        <Button color="inherit" onClick={handleAddCustomer}>Add Customer</Button>
+                        
                     </div>
                 </Toolbar>
             </AppBar>

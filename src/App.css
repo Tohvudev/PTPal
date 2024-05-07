@@ -40,3 +40,7 @@
 .read-the-docs {
   color: #888;
 }
+.delete-button-red {
+  color: red !important; 
+  font-weight: bold;
+}

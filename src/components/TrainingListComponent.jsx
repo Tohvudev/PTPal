@@ -211,12 +211,12 @@ const TrainingListComponent = () => {
         <>
             <AppBar position="static">
                 <Toolbar>
-                    <Typography variant="h6">
+                <Typography variant="h6" component={Link} to="/" style={{ color: 'inherit', textDecoration: 'none' }}>
                         PTPal
                     </Typography>
                     <div style={{ marginLeft: 'auto' }}>
                         <CSVLink data={csvData} filename={"trainings.csv"}>
-                        <Button color="inherit">Export to CSV</Button>
+                        <Button style={{ color : 'white'}}>Export to CSV</Button>
                         </CSVLink>
                         <Button color="inherit" component={Link} to="/customer">Customer</Button>
                         <Button color="inherit" onClick={handleAddTraining}>Add Training</Button>
